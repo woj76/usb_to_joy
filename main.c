@@ -57,7 +57,7 @@ void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance)
 {
 	(void)dev_addr;
 	(void)instance;
-	// printf("HID device address = %d, instance = %d is unmounted\r\n", dev_addr, instance);
+	//printf("HID device address = %d, instance = %d is unmounted\r\n", dev_addr, instance);
 }
 
 void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* report, uint16_t len)
@@ -68,20 +68,40 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
 	bool up = true;
 	bool down = true;
 
-	if(report[4] & 0xf0)
+	if(gpio_get(9)) {
+		if(report[4] & 0xf0)
+			fire = false;
+
+		switch(report[4] & 0x0f) {
+			case 0x0: up = false; break;
+			case 0x1: up = false; right = false; break;
+			case 0x2: right = false; break;
+			case 0x3: down = false; right = false; break;
+			case 0x4: down = false; break;
+			case 0x5: down = false; left = false; break;
+			case 0x6: left = false; break;
+			case 0x7: up = false; left = false; break;
+			default: break;
+		}
+
+	} else {
+
+		if(report[6] & 0x03)
 		fire = false;
 
-	switch(report[4] & 0x0f) {
-		case 0x0: up = false; break;
-		case 0x1: up = false; right = false; break;
-		case 0x2: right = false; break;
-		case 0x3: down = false; right = false; break;
-		case 0x4: down = false; break;
-		case 0x5: down = false; left = false; break;
-		case 0x6: left = false; break;
-		case 0x7: up = false; left = false; break;
-		default: break;
+		switch(report[0]) {
+			case 0x00: left = false; break;
+			case 0xFF: right = false; break;
+			default: break;
+		}
+		switch(report[1]) {
+			case 0x00: up = false; break;
+			case 0xFF: down = false; break;
+			default: break;
+		}
+
 	}
+
 	// up, down, left, right 5, 4, 3, 2
 	// fire 6
 	gpio_put(2, right);
@@ -89,7 +109,7 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
 	gpio_put(4, down);
 	gpio_put(5, up);
 	gpio_put(6, fire);
-	// printf("Left:  %02X Up:    %02X Right: %02X Down:  %02X Fire:  %02X\r\n", left, up, right, down, fire);
+
 	tuh_hid_receive_report(dev_addr, instance);
 }
 
@@ -116,6 +136,10 @@ int main(void)
 		gpio_set_dir(pin, GPIO_OUT);
 		gpio_put(pin, 1);
 	}
+	gpio_init(9);
+	gpio_set_dir(9, GPIO_IN);
+	gpio_pull_up(9);
+
 	tuh_init(BOARD_TUH_RHPORT);
 
 	if (board_init_after_tusb)
